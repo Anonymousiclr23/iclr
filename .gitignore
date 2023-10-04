@@ -1,0 +1,9 @@
+*.txt
+*.png
+*.mp4
+*.npy
+*.bash
+*.pt
+*.pyc
+*checkpoint*
+*cache*
