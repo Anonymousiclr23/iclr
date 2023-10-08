@@ -10,7 +10,7 @@ argparser.add_argument('--imgc', type=int, help='imgc', default=1)
 argparser.add_argument('--outc', type=int, help='outc', default=2)
 argparser.add_argument('--batch_size', type=int, help='batch size', default=64)
 argparser.add_argument('--lr', type=float, help='initial learning rate', default=1e-3)
-argparser.add_argument("--data_folder", type=str, help='folder for the data', default="/scratch/groups/jonfan/UNet/data/data_generation_52_thick_8bar_Si/30k_new_wmin625")
+argparser.add_argument("--data_folder", type=str, help='folder for the data', default="")
 argparser.add_argument("--total_shapex", type=int, help='total size in x', default=0)
 argparser.add_argument("--total_shapey", type=int, help='total size in y', default=0)
 argparser.add_argument("--periodic", type=int, help='if == 1, device is half periodic', default=0)
@@ -23,7 +23,7 @@ argparser.add_argument("--arch", type=str, help='architecture of the learner', d
 argparser.add_argument("--HIDDEN_DIM", type=int, help='width of Unet, i.e. number of kernels of first block', default=64)
 argparser.add_argument("--model_saving_path", type=str, help="the root dir to save checkpoints", default="") 
 # argparser.add_argument("--model_name", type=str, help="name for the model, used for storing under the model_saving_path", default="test")
-argparser.add_argument("--Si_model_name", type=str, help="model for high contrast Si", default="")
+argparser.add_argument("--mat_model_name", type=str, help="model for high contrast grascale material", default="")
 argparser.add_argument("--src_model_name", type=str, help="model for source", default="")
 argparser.add_argument("--pml_model_name", type=str, help="model for pml", default="")      
 
@@ -72,22 +72,16 @@ import time
 
 from JAX_DDM_util import *
 
-from JAX_SM_FNO_Si_conv import FNO_multimodal_2d as SM_FNO_Si
+from JAX_SM_FNO_mat_conv import FNO_multimodal_2d as SM_FNO_mat
 from JAX_SM_FNO_source_conv import FNO_multimodal_2d as SM_FNO_src
 from JAX_SM_FNO_pml import FNO_multimodal_2d as SM_FNO_pml
 
 from DDM_dataset import DDM_Dataset
-from Adam import Adam
 from matplotlib import pyplot as plt
 from matplotlib import rc
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import torch.distributed as dist
 
 import cv2
-
-n_air=1.
-n_Si=3.567390909090909
-n_sub=1.45
 
 EPSILON_0 = 8.85418782e-12        # vacuum permittivity
 MU_0 = 1.25663706e-6              # vacuum permeability
@@ -101,23 +95,23 @@ def get_non_zero_indices(batched_data):
     return tuple(jnp.nonzero(data)[0].tolist())
 
 @partial(jax.jit, static_argnums = [0,1,2,3,4])
-def combine_batch(total_size, Si_indices, src_indices, pml_indices, shape, Si_batch, src_batch, pml_batch):
+def combine_batch(total_size, mat_indices, src_indices, pml_indices, shape, mat_batch, src_batch, pml_batch):
     combined = []
-    if len(Si_indices)==0:
-        Si_indices = [-1]
+    if len(mat_indices)==0:
+        mat_indices = [-1]
     if len(src_indices)==0:
         src_indices = [-1]
     if len(pml_indices)==0:
         pml_indices = [-1]
 
     count = 0
-    head_Si=0
+    head_mat=0
     head_src=0
     head_pml=0
     while count < total_size:
-        if count==Si_indices[head_Si]:
-            combined.append(Si_batch[head_Si])
-            head_Si = min(len(Si_indices)-1, head_Si+1)
+        if count==mat_indices[head_mat]:
+            combined.append(mat_batch[head_mat])
+            head_mat = min(len(mat_indices)-1, head_mat+1)
             count += 1
         elif count==src_indices[head_src]:
             combined.append(src_batch[head_src])
@@ -187,13 +181,8 @@ def combine_bc(top_bc_train,bottom_bc_train,left_bc_train,right_bc_train):
     return jax.lax.stop_gradient(top_bc_train_RI), jax.lax.stop_gradient(bottom_bc_train_RI), jax.lax.stop_gradient(left_bc_train_RI), jax.lax.stop_gradient(right_bc_train_RI)
 
 @eqx.filter_jit
-def Si_model_eval(Si_model, Si_idx, yeex_batch_train, yeey_batch_train, top_bc_train_RI, bottom_bc_train_RI, left_bc_train_RI, right_bc_train_RI):
-    return eqx.filter_vmap(Si_model)(yeex_batch_train, yeey_batch_train, top_bc_train_RI[Si_idx,:,:,:], bottom_bc_train_RI[Si_idx,:,:,:], left_bc_train_RI[Si_idx,:,:,:], right_bc_train_RI[Si_idx,:,:,:])
-
-@eqx.filter_jit
-def Si_model_eval_breakdown(Si_model, Si_idx, yeex_batch_train, yeey_batch_train, top_bc_train_RI, bottom_bc_train_RI, left_bc_train_RI, right_bc_train_RI, start_ends):
-    filtered_model = eqx.filter_vmap(Si_model)
-    return jnp.concatenate([filtered_model(yeex_batch_train[i[0]:i[1]], yeey_batch_train[i[0]:i[1]], top_bc_train_RI[Si_idx[i[0]:i[1]],:,:,:], bottom_bc_train_RI[Si_idx[i[0]:i[1]],:,:,:], left_bc_train_RI[Si_idx[i[0]:i[1]],:,:,:], right_bc_train_RI[Si_idx[i[0]:i[1]],:,:,:]) for i in start_ends], axis=0)
+def mat_model_eval(mat_model, mat_idx, yeex_batch_train, yeey_batch_train, top_bc_train_RI, bottom_bc_train_RI, left_bc_train_RI, right_bc_train_RI):
+    return eqx.filter_vmap(mat_model)(yeex_batch_train, yeey_batch_train, top_bc_train_RI[mat_idx,:,:,:], bottom_bc_train_RI[mat_idx,:,:,:], left_bc_train_RI[mat_idx,:,:,:], right_bc_train_RI[mat_idx,:,:,:])
 
 @eqx.filter_jit
 def src_model_eval(src_model, src_idx, source_batch_train_RI, top_bc_train_RI, bottom_bc_train_RI, left_bc_train_RI, right_bc_train_RI):
@@ -266,36 +255,27 @@ def prepare_loaded_data(DDM_img, DDM_Hy, DDM_source, data_mult, dL, wl, overlap_
 
     return DDM_img, DDM_Hy, DDM_source
 
-def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-
-    # initialize the process group
-    dist.init_process_group("gloo", rank=rank, world_size=world_size)
-
 def main(args):
     key = jax.random.PRNGKey(args.seed)
-
-    setup(0,1)
 
     jax_devices = jax.devices('gpu')
     print("jax_devices: ", jax_devices)
     
     all_models = os.listdir(args.model_saving_path)
 
-    # load the Si model with JAX Equinox:
-    matching_models = [i for i in all_models if i[:len(args.Si_model_name)] == args.Si_model_name]
+    # load the material model with JAX Equinox:
+    matching_models = [i for i in all_models if i[:len(args.mat_model_name)] == args.mat_model_name]
     if len(matching_models) == 0:
-        raise ValueError("no model found for ", args.Si_model_name)
+        raise ValueError("no model found for ", args.mat_model_name)
     if len(matching_models)>1:
         raise ValueError("more than 1 models found!", matching_models)
     path = args.model_saving_path +matching_models[0]+"/best_model.eqx"
     with open(args.model_saving_path +matching_models[0]+'/config.txt') as f:
-        SI_args = reconstruct_args(f)
-    print("SI_args: ", SI_args)
-    model_original = SM_FNO_Si(SI_args, key = key)
-    Si_model = eqx.tree_deserialise_leaves(path, model_original)
-    print("Si model loaded from ", path)
+        mat_args = reconstruct_args(f)
+    print("mat_args: ", mat_args)
+    model_original = SM_FNO_mat(mat_args, key = key)
+    mat_model = eqx.tree_deserialise_leaves(path, model_original)
+    print("material model loaded from ", path)
 
     # load the src model:
     matching_models = [i for i in all_models if i[:len(args.src_model_name)] == args.src_model_name]
@@ -405,12 +385,12 @@ def main(args):
             src_idx = get_non_zero_indices(source_batch_train_RI)
             pml_idx = get_non_zero_indices(pml_batch_train)
             assert len(set(src_idx).intersection(set(pml_idx))) == 0
-            Si_idx = tuple(sorted(list(set(range(source_batch_train_RI.shape[0]))-set(src_idx)-set(pml_idx))))
-            print(f"batch size for Si,src,pml: {len(Si_idx)}, {len(src_idx)}, {len(pml_idx)}")
+            mat_idx = tuple(sorted(list(set(range(source_batch_train_RI.shape[0]))-set(src_idx)-set(pml_idx))))
+            print(f"batch size for mat,src,pml: {len(mat_idx)}, {len(src_idx)}, {len(pml_idx)}")
 
         # index all fixed data:
-        yeex_batch_train_indexed = yeex_batch_train[Si_idx,:,:]
-        yeey_batch_train_indexed = yeey_batch_train[Si_idx,:,:]
+        yeex_batch_train_indexed = yeex_batch_train[mat_idx,:,:]
+        yeey_batch_train_indexed = yeey_batch_train[mat_idx,:,:]
         source_batch_train_RI_indexed = source_batch_train_RI[src_idx,:,:]
         Sx_f_batch_train_RI_indexed = Sx_f_batch_train_RI[pml_idx,:,:,1]
         Sy_f_batch_train_RI_indexed = Sy_f_batch_train_RI[pml_idx,:,:,1]
@@ -428,9 +408,9 @@ def main(args):
             top_bc_train_RI, bottom_bc_train_RI, left_bc_train_RI, right_bc_train_RI = combine_bc(top_bc_train, bottom_bc_train, left_bc_train, right_bc_train)
 
             time4 = time.time()
-            Si_logits_RI, src_logits_RI, pml_logits_RI=None,None,None
-            if len(Si_idx)>0:
-                Si_logits_RI  = Si_model_eval(Si_model, Si_idx, yeex_batch_train_indexed, yeey_batch_train_indexed, top_bc_train_RI, bottom_bc_train_RI, left_bc_train_RI, right_bc_train_RI)
+            mat_logits_RI, src_logits_RI, pml_logits_RI=None,None,None
+            if len(mat_idx)>0:
+                mat_logits_RI  = mat_model_eval(mat_model, mat_idx, yeex_batch_train_indexed, yeey_batch_train_indexed, top_bc_train_RI, bottom_bc_train_RI, left_bc_train_RI, right_bc_train_RI)
 
             if len(src_idx)>0:
                 src_logits_RI  = src_model_eval(src_model, src_idx, args.source_mult*source_batch_train_RI_indexed, top_bc_train_RI, bottom_bc_train_RI, left_bc_train_RI, right_bc_train_RI)
@@ -439,7 +419,7 @@ def main(args):
                 pml_logits_RI  = pml_model_eval(pml_model, pml_idx, Sx_f_batch_train_RI_indexed, Sy_f_batch_train_RI_indexed, top_bc_train_RI, bottom_bc_train_RI, left_bc_train_RI, right_bc_train_RI)
 
             time45 = time.time()
-            logits = combine_batch(x_patches*y_patches, Si_idx, src_idx, pml_idx, y_batch_train_RI.shape, Si_logits_RI, src_logits_RI, pml_logits_RI)
+            logits = combine_batch(x_patches*y_patches, mat_idx, src_idx, pml_idx, y_batch_train_RI.shape, mat_logits_RI, src_logits_RI, pml_logits_RI)
 
             time5 = time.time()
 
