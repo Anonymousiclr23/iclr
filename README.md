@@ -8,3 +8,5 @@ A general neural surrogate PDE solver that solves PDEs with arbitrary size, para
 
 <img src="https://github.com/Anonymousiclr23/iclr/assets/146407366/493d49b7-d500-4ec7-832d-53e109c7313b" width="110" height="350"/>
 <img src="https://github.com/Anonymousiclr23/iclr/assets/146407366/2c74ef94-e252-4c61-98d6-0902990849e3" width="100" height="350"/>
+
+Data and pre-trained model could be downloaded from [here](https://drive.google.com/drive/folders/1cdUKu4IyPA-6idqQ-ujEW0FrG0wabWQl?usp=sharing)
