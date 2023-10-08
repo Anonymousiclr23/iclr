@@ -1,0 +1,20 @@
+python3 train_material_model.py \
+        --model_name material_model \
+        --model_saving_path "your model saving path" \
+        --data_folder "your subdomain data path" \
+        --data_mult 500 \
+        --f_modes 16  \
+        --HIDDEN_DIM 16 \
+        --num_fourier_layers 16 \
+        --domain_sizex 64 \
+        --domain_sizey 64 \
+        --ALPHA 0.01 \
+        --f_padding 20 \
+        --start_lr 3e-4 \
+        --end_lr 1e-5 \
+        --ratio 0.3 \
+        --batch_size 64 \
+        --continue_train 0 \
+        --epoch 100 \
+        --num_GPUs 1 \
+        --visible_GPUs 0 \
