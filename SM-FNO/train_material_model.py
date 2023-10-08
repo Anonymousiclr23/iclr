@@ -148,7 +148,7 @@ def main(args,seed):
     key = jax.random.PRNGKey(seed)
 
     # Loading and splitting dataset
-    model_path = args.model_saving_path + args.model_name + "/" + \
+    model_path = args.model_saving_path + "/" + args.model_name + \
                                           "_domain_size_" + str(args.domain_sizex) + "_"+ str(args.domain_sizey) + \
                                           "_fmodes_" + str(args.f_modes) + \
                                           "_flayers_" + str(args.num_fourier_layers) + \
