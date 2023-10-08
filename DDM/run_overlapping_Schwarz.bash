@@ -1,0 +1,20 @@
+python3 overlapping_ml_jax_video.py \
+        --Si_model_name grayscale_air_to_Ge_conv_physics_1M_small_2_domain_size_64_64_fmodes_16_flayers_16_Hidden_24_f_padding_20_batch_size_60_lr_0.0003 \
+        --src_model_name final_source_conv_physics_full_yee_pad_100k_datamult_500_sourcemult_5000_ave_bc_small_2_domain_size_64_64_fmodes_10_flayers_10_Hidden_10_f_padding_20_batch_size_60_lr_0.0003 \
+        --pml_model_name final_pml_physics_full_yee_pad_100k_datamult_500_ave_bc_small_domain_size_64_64_fmodes_24_flayers_16_Hidden_16_f_padding_20_batch_size_60_lr_0.0003 \
+        --model_saving_path "path for saving the 3 models" \
+        --domain_sizex 64 \
+        --domain_sizey 64 \
+        --overlap_pixels 4 \
+        --data_folder "path for DDM dataset" \
+        --data_mult 500 \
+        --source_mult 10 \
+        --total_shapex "pixels in x" \
+        --total_shapey "pixels in y" \
+        --periodic 1 \
+        --div_k 4 \
+        --DDM_iters 200 \
+        --momentum 0.1 \
+        --pml_thickness 40 \
+        --float_bits 32 \
+        --write_video 1
