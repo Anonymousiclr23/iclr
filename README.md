@@ -10,3 +10,8 @@ A general neural surrogate PDE solver that solves PDEs with arbitrary size, para
 <img src="https://github.com/Anonymousiclr23/iclr/assets/146407366/2c74ef94-e252-4c61-98d6-0902990849e3" width="100" height="350"/>
 
 Data and pre-trained model could be downloaded from [here](https://drive.google.com/drive/folders/1cdUKu4IyPA-6idqQ-ujEW0FrG0wabWQl?usp=sharing)
+
+# Environment
+`pip install -r requirements.txt`
+
+The project uses [JAX](https://github.com/google/jax) and [equinox](https://github.com/patrick-kidger/equinox). Please refer to their installation guide for version compatibilities.
