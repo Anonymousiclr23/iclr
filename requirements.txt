@@ -1,0 +1,7 @@
+numpy==1.24.3
+jax==0.4.8
+-f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+jaxlib==0.4.7+cuda12.cudnn88
+equinox==0.10.2
+optax==0.1.5
+cloudpickle
